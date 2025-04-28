@@ -1,49 +1,49 @@
-package vazita.service;
+package vazita.controllers;
 
-
-
-import vazita.model.entity.Utilisateur;
-import vazita.security.JwtTokenUtil;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.stereotype.Service;
-
-import jakarta.persistence.EntityNotFoundException;
 
 
 import  vazita.model.dto.AuthRequest;
 import  vazita.model.dto.AuthResponse;
+import  vazita.model.entity.Utilisateur;
 import  vazita.repository.UtilisateurRepository;
-
+import  vazita.security.JwtTokenUtil;
+import  vazita.service.TokenBlacklistService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Optional;
 
-@Service
+@RestController
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
-public class AuthService {
+public class AuthController {
 
     private final AuthenticationManager authenticationManager;
-    private final UserDetailsServiceImpl userDetailsService;
+    private final UserDetailsService userDetailsService;
     private final JwtTokenUtil jwtUtil;
     private final UtilisateurRepository utilisateurRepository;
     private final TokenBlacklistService tokenService;
 
-    public AuthResponse login(AuthRequest authRequest) {
+    @PostMapping("/login")
+    public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthRequest authRequest) {
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword())
             );
         } catch (BadCredentialsException e) {
-            throw new BadCredentialsException("Incorrect username or password");
+            return ResponseEntity.status(401).body("Incorrect username or password");
         }
 
         Optional<Utilisateur> utilisateurOpt = utilisateurRepository.findByIdUser(authRequest.getUsername());
         
         if (utilisateurOpt.isEmpty()) {
-            throw new EntityNotFoundException("User not found");
+            return ResponseEntity.status(401).body("User not found");
         }
         
         Utilisateur utilisateur = utilisateurOpt.get();
@@ -54,19 +54,21 @@ public class AuthService {
         // Store the token in Redis
         tokenService.storeUserSession(authRequest.getUsername(), token);
         
-        return new AuthResponse(token, utilisateur.getNom(), utilisateur.getPrenom(), 
-                utilisateur.getCodGrp(), utilisateur.getIdCentre());
+        return ResponseEntity.ok(new AuthResponse(token, utilisateur.getNom(), utilisateur.getPrenom(), 
+                utilisateur.getCodGrp(), utilisateur.getIdCentre()));
     }
     
-    public void logout(String token) {
-        if (token != null && token.startsWith("Bearer ")) {
-            String jwt = token.substring(7);
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestHeader("Authorization") String authHeader) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String jwt = authHeader.substring(7);
             String username = jwtUtil.extractUsername(jwt);
             
             // Invalidate the session and blacklist the token
             tokenService.invalidateUserSession(username);
-        } else {
-            throw new IllegalArgumentException("Invalid token");
+            return ResponseEntity.ok("Logged out successfully");
         }
+        
+        return ResponseEntity.badRequest().body("Invalid token");
     }
 }

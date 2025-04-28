@@ -1,10 +1,10 @@
 package vazita.repository;
 
-// Import necessary classes
-import vazita.model.Utilisateur;               // The entity class representing a user (Utilisateur)
 import org.springframework.data.jpa.repository.JpaRepository;  // Interface from Spring Data JPA to provide CRUD operations
 import org.springframework.data.jpa.repository.Query;  // To define custom JPQL queries
 import org.springframework.data.repository.query.Param;  // To bind query parameters to method arguments
+
+import vazita.model.entity.Utilisateur;
 
 import java.util.List;                         // For returning a list of Utilisateur entities
 import java.util.Optional;                    // For returning an Optional, useful for handling nulls safely

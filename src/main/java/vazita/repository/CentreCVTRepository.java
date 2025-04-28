@@ -1,8 +1,8 @@
 package vazita.repository;
 
-// Import necessary classes
-import vazita.model.CentreCVT;                // The entity class representing a center CVT (likely a data model for center details)
 import org.springframework.data.jpa.repository.JpaRepository;  // Interface from Spring Data JPA to provide CRUD operations
+
+import vazita.model.entity.CentreCVT;
 
 // This interface defines a repository for the CentreCVT entity
 // It extends JpaRepository, which provides various methods to interact with the database

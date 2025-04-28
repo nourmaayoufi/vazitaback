@@ -2,7 +2,7 @@ package vazita.service;
 
 
 import vazita.config.DataSourceRouter;
-import vazita.model.CentreCVT;
+import vazita.model.entity.CentreCVT;
 import vazita.repository.CentreCVTRepository;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;

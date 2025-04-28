@@ -1,8 +1,8 @@
 package vazita.repository;
 
-// Import necessary classes
-import vazita.model.Groupe;                // The entity class representing a group
 import org.springframework.data.jpa.repository.JpaRepository;  // Interface from Spring Data JPA to provide CRUD operations
+
+import vazita.model.entity.Groupe;
 
 // This interface defines a repository for the Groupe entity
 // It extends JpaRepository, which provides various methods to interact with the database
