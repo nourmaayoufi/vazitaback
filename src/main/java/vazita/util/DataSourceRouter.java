@@ -1,74 +1,70 @@
 package vazita.util;
 
-
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
-
-import javax.sql.DataSource;
-import java.util.HashMap;
+import lombok.extern.slf4j.Slf4j;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.sql.DataSource;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 /**
- * Custom routing data source for switching between center-specific databases.
- * Uses thread-local context to determine the current center.
+ * Custom implementation of AbstractRoutingDataSource that routes to the correct 
+ * center database based on the CenterContextHolder
  */
 @Slf4j
 public class DataSourceRouter extends AbstractRoutingDataSource {
-
-    // Cache for DataSource instances to avoid recreating them
-    private final Map<String, DataSource> centerDataSources = new ConcurrentHashMap<>();
+    
+    private final Map<Object, Object> dynamicDataSources = new ConcurrentHashMap<>();
 
     @Override
     protected Object determineCurrentLookupKey() {
-        // Get the center ID from thread-local context
-        String centerId = CenterContextHolder.getCenterId();
-        log.debug("Routing to data source for center: {}", centerId);
-        return centerId != null ? centerId : "CENTRALE";
+        return CenterContextHolder.getCenter();
     }
-
+    
     /**
-     * Adds a new center data source dynamically
-     * @param centerId Center ID
-     * @param machine Database server hostname
-     * @param sid Oracle SID
+     * Adds a new center datasource dynamically
+     * 
+     * @param centerKey The center identifier
+     * @param jdbcUrl The JDBC URL for the center's database
      * @param username Database username
      * @param password Database password
-     * @return Created DataSource instance
+     * @return true if the datasource was added successfully, false otherwise
      */
-    public synchronized DataSource addCenterDataSource(String centerId, String machine, String sid, 
-                                                    String username, String password) {
-        if (centerDataSources.containsKey(centerId)) {
-            log.debug("Using cached data source for center: {}", centerId);
-            return centerDataSources.get(centerId);
+    public synchronized boolean addCenterDataSource(String centerKey, String jdbcUrl, String username, String password) {
+        try {
+            if (dynamicDataSources.containsKey(centerKey)) {
+                log.info("Data source for center {} already exists", centerKey);
+                return true;
+            }
+            
+            log.info("Adding new data source for center: {}", centerKey);
+            
+            HikariConfig config = new HikariConfig();
+            config.setJdbcUrl(jdbcUrl);
+            config.setUsername(username);
+            config.setPassword(password);
+            config.setMaximumPoolSize(10);
+            config.setMinimumIdle(2);
+            config.setIdleTimeout(30000);
+            config.setConnectionTimeout(20000);
+            config.setPoolName("HikariPool-" + centerKey);
+            
+            DataSource dataSource = new HikariDataSource(config);
+            
+            // Add to our local tracking map
+            dynamicDataSources.put(centerKey, dataSource);
+            
+            // Update the target datasources
+            Map<Object, Object> targetDataSources = new ConcurrentHashMap<>(dynamicDataSources);
+            setTargetDataSources(targetDataSources);
+            
+            // Reinitialize the router with the new data source
+            afterPropertiesSet();
+            
+            log.info("Data source for center {} added successfully", centerKey);
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to add data source for center: " + centerKey, e);
+            return false;
         }
-
-        log.info("Creating new data source for center: {}", centerId);
-        
-        HikariConfig config = new HikariConfig();
-        String jdbcUrl = String.format("jdbc:oracle:thin:@%s:1521:%s", machine, sid);
-        config.setJdbcUrl(jdbcUrl);
-        config.setUsername(username);
-        config.setPassword(password);
-        config.setConnectionTimeout(30000);
-        config.setIdleTimeout(600000);
-        config.setMaxLifetime(1800000);
-        config.setMaximumPoolSize(10);
-        config.setMinimumIdle(2);
-        
-        DataSource dataSource = new HikariDataSource(config);
-        
-        // Add to the target data sources
-        Map<Object, Object> targetDataSources = new HashMap<>(getResolvedDataSources());
-        targetDataSources.put(centerId, dataSource);
-        setTargetDataSources(targetDataSources);
-        afterPropertiesSet(); // Reinitialize the resolved data sources
-        
-        // Cache the data source
-        centerDataSources.put(centerId, dataSource);
-        
-        return dataSource;
-    }
-}

@@ -1,37 +1,49 @@
 package vazita.util;
 
-
+import org.springframework.util.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Thread-local storage for center context to support multi-tenant database routing.
+ * ThreadLocal storage for the current database center context
+ * Used by the DataSourceRouter to determine which database to route to
  */
 @Slf4j
 public class CenterContextHolder {
-    private static final ThreadLocal<String> CONTEXT = new ThreadLocal<>();
+
+    public static final String DEFAULT_CENTER = "CENTRALE";
+    
+    private static final ThreadLocal<String> contextHolder = new ThreadLocal<>();
 
     /**
-     * Set the current center ID for this thread
-     * @param centerId ID of the center
+     * Set the current center context
+     * @param center The center identifier
      */
-    public static void setCenterId(String centerId) {
-        log.debug("Setting center context: {}", centerId);
-        CONTEXT.set(centerId);
+    public static void setCenter(String center) {
+        if (!StringUtils.hasText(center)) {
+            throw new IllegalArgumentException("Center identifier cannot be empty");
+        }
+        log.debug("Setting center context to: {}", center);
+        contextHolder.set(center);
     }
 
     /**
-     * Get the current center ID from this thread
-     * @return Current center ID or null if not set
+     * Get the current center context
+     * @return The current center identifier or DEFAULT_CENTER if not set
      */
-    public static String getCenterId() {
-        return CONTEXT.get();
+    public static String getCenter() {
+        String center = contextHolder.get();
+        if (!StringUtils.hasText(center)) {
+            log.debug("No center context found, using default: {}", DEFAULT_CENTER);
+            return DEFAULT_CENTER;
+        }
+        return center;
     }
 
     /**
-     * Clear the center context for this thread
+     * Clear the current center context
      */
-    public static void clear() {
+    public static void clearCenter() {
         log.debug("Clearing center context");
-        CONTEXT.remove();
+        contextHolder.remove();
     }
 }
