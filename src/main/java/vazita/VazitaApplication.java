@@ -3,12 +3,19 @@ package vazita;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 /**
- * Main application class for the Vehicle Inspection App, bootstrapping the Spring Boot application.
+ * Main Application class for the Vehicle Inspection System.
+ * Sets up Spring Boot application with necessary configurations.
  */
 @SpringBootApplication
-@EnableJpaRepositories(basePackages = {"vazita.repository"})
+@EnableCaching
+@EnableScheduling
+@EnableTransactionManagement
+@EnableJpaRepositories
 public class VazitaApplication {
 
     /**

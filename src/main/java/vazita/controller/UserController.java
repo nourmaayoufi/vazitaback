@@ -1,69 +1,100 @@
 package vazita.controller;
 
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
-
-import java.time.LocalDate;
-import java.util.List;
-import vazita.dto.UserDto;
-import vazita.dto.UserRequest;
+import vazita.dto.user.UserCreateRequest;
+import vazita.dto.user.UserDto;
+import vazita.dto.user.UserUpdateRequest;
 import vazita.service.UserService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 
+/**
+ * Controller for user management operations
+ */
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@Slf4j
 public class UserController {
+
     private final UserService userService;
 
+    /**
+     * Get all users for the current center with pagination
+     *
+     * @param pageable pagination parameters
+     * @return page of users
+     */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<UserDto>> getAllUsers(Pageable pageable) {
-        log.info("Fetching all users for center");
         return ResponseEntity.ok(userService.getAllUsersForCurrentCenter(pageable));
     }
 
-    @GetMapping("/{id}")
+    /**
+     * Get user by ID
+     *
+     * @param userId user ID
+     * @return user details
+     */
+    @GetMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserDto> getUserById(@PathVariable Long id) {
-        log.info("Fetching user with id: {}", id);
-        return ResponseEntity.ok(userService.getUserById(id));
+    public ResponseEntity<UserDto> getUserById(@PathVariable String userId) {
+        return ResponseEntity.ok(userService.getUserById(userId));
     }
 
+    /**
+     * Create new user
+     *
+     * @param request user creation request
+     * @return created user
+     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserRequest userRequest) {
-        log.info("Creating new user: {}", userRequest.getUsername());
-        return ResponseEntity.ok(userService.createUser(userRequest));
+    public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserCreateRequest request) {
+        return new ResponseEntity<>(userService.createUser(request), HttpStatus.CREATED);
     }
 
-    @PutMapping("/{id}")
+    /**
+     * Update user
+     *
+     * @param userId user ID
+     * @param request user update request
+     * @return updated user
+     */
+    @PutMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserDto> updateUser(@PathVariable Long id, @Valid @RequestBody UserRequest userRequest) {
-        log.info("Updating user with id: {}", id);
-        return ResponseEntity.ok(userService.updateUser(id, userRequest));
+    public ResponseEntity<UserDto> updateUser(
+            @PathVariable String userId,
+            @Valid @RequestBody UserUpdateRequest request) {
+        return ResponseEntity.ok(userService.updateUser(userId, request));
     }
 
-    @DeleteMapping("/{id}")
+    /**
+     * Delete user
+     *
+     * @param userId user ID
+     * @return success message
+     */
+    @DeleteMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
-        log.info("Deleting user with id: {}", id);
-        userService.deleteUser(id);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<String> deleteUser(@PathVariable String userId) {
+        userService.deleteUser(userId);
+        return ResponseEntity.ok("User deleted successfully");
+    }
+
+    /**
+     * Get current user info
+     *
+     * @return current user details
+     */
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> getCurrentUser() {
+        return ResponseEntity.ok(userService.getCurrentUser());
     }
 }

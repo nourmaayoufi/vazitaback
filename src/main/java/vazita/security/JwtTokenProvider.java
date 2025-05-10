@@ -1,190 +1,136 @@
 package vazita.security;
 
 
-import vazita.entity.User;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
-import lombok.RequiredArgsConstructor;
+
+import io.jsonwebtoken.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
-import jakarta.annotation.PostConstruct;
-import java.security.Key;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-/**
- * Component for JWT token generation, validation, and management
- */
 @Component
 @Slf4j
-@RequiredArgsConstructor
 public class JwtTokenProvider {
 
-    private final RedisTemplate<String, String> redisTemplate;
+    @Value("${jwt.secret}")
+    private String jwtSecret;
 
-    @Value("${app.jwt.expiration}")
-    private long jwtExpiration;
+    @Value("${jwt.expiration}")
+    private long jwtExpirationInMs;
 
-    @Value("${app.jwt.refresh-expiration}")
-    private long refreshExpiration;
-    
-    private Key key;
-    
-    @PostConstruct
-    public void init() {
-        // Generate a strong key for HMAC-SHA signing
-        this.key = Keys.secretKeyFor(SignatureAlgorithm.HS512);
-    }
-    
-    /**
-     * Generate JWT token from authentication object
-     */
+    @Value("${jwt.refresh-expiration}")
+    private long refreshExpirationInMs;
+
+    @Autowired
+    private UserDetailsServiceImpl userDetailsService;
+
+    @Autowired
+    private BlackListService blackListService;
+
     public String generateToken(Authentication authentication) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + jwtExpiration);
+        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
         
-        String authorities = userDetails.getAuthorities().stream()
+        String authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.joining(","));
+
+        return Jwts.builder()
+                .setSubject(userDetails.getUsername())
+                .claim("roles", authorities)
+                .claim("center", getCenterIdFromUser(userDetails))
+                .setIssuedAt(new Date())
+                .setExpiration(expiryDate)
+                .signWith(SignatureAlgorithm.HS512, jwtSecret)
+                .compact();
+    }
+
+    public String generateRefreshToken(Authentication authentication) {
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + refreshExpirationInMs);
         
         return Jwts.builder()
                 .setSubject(userDetails.getUsername())
-                .claim("id", userDetails.getId())
-                .claim("roles", authorities)
-                .claim("centerId", userDetails.getCenterId())
-                .setIssuedAt(now)
-                .setExpiration(expiry)
-                .signWith(key)
+                .setIssuedAt(new Date())
+                .setExpiration(expiryDate)
+                .signWith(SignatureAlgorithm.HS512, jwtSecret)
                 .compact();
     }
-    
-    /**
-     * Generate JWT token from user entity
-     */
-    public String generateToken(User user) {
-        Date now = new Date();
-        Date expiry = new Date(now.getTime() + jwtExpiration);
-        
-        return Jwts.builder()
-                .setSubject(user.getIdUser())
-                .claim("id", user.getIdUser())
-                .claim("roles", "ROLE_" + user.getGroup().getDesignation())
-                .claim("centerId", user.getIdCentre())
-                .setIssuedAt(now)
-                .setExpiration(expiry)
-                .signWith(key)
-                .compact();
+
+    public String getUsernameFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .setSigningKey(jwtSecret)
+                .parseClaimsJws(token)
+                .getBody();
+
+        return claims.getSubject();
     }
-    
-    /**
-     * Generate refresh token
-     */
-    public String generateRefreshToken(String userId) {
-        Date now = new Date();
-        Date expiry = new Date(now.getTime() + refreshExpiration);
-        
-        String refreshToken = Jwts.builder()
-                .setSubject(userId)
-                .setIssuedAt(now)
-                .setExpiration(expiry)
-                .signWith(key)
-                .compact();
-        
-        // Store refresh token in Redis with expiration
-        redisTemplate.opsForValue().set(
-                "refresh_token:" + userId,
-                refreshToken,
-                refreshExpiration,
-                TimeUnit.MILLISECONDS
-        );
-        
-        return refreshToken;
+
+    public Integer getCenterIdFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .setSigningKey(jwtSecret)
+                .parseClaimsJws(token)
+                .getBody();
+
+        return claims.get("center", Integer.class);
     }
-    
-    /**
-     * Validate JWT token
-     */
-    public boolean validateToken(String token) {
+
+    private Integer getCenterIdFromUser(UserDetails userDetails) {
+        if (userDetails instanceof UserDetailsImpl) {
+            return ((UserDetailsImpl) userDetails).getCenterId();
+        }
+        return null;
+    }
+
+    public boolean validateToken(String authToken) {
         try {
-            // Check if token is blacklisted
-            if (redisTemplate.hasKey("blacklist:" + token)) {
-                log.warn("Attempt to use blacklisted token");
+            if (blackListService.isBlacklisted(authToken)) {
                 return false;
             }
             
-            Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token);
-            
+            Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(authToken);
             return true;
-        } catch (Exception e) {
-            log.error("Invalid JWT token: {}", e.getMessage());
-            return false;
+        } catch (SignatureException ex) {
+            log.error("Invalid JWT signature");
+        } catch (MalformedJwtException ex) {
+            log.error("Invalid JWT token");
+        } catch (ExpiredJwtException ex) {
+            log.error("Expired JWT token");
+        } catch (UnsupportedJwtException ex) {
+            log.error("Unsupported JWT token");
+        } catch (IllegalArgumentException ex) {
+            log.error("JWT claims string is empty");
         }
+        return false;
     }
-    
-    /**
-     * Get user ID from JWT token
-     */
-    public String getUserIdFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
+
+    public Authentication getAuthentication(String token) {
+        Claims claims = Jwts.parser()
+                .setSigningKey(jwtSecret)
                 .parseClaimsJws(token)
                 .getBody();
-        
-        return claims.getSubject();
-    }
-    
-    /**
-     * Get center ID from JWT token
-     */
-    public String getCenterIdFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-        
-        return claims.get("centerId", String.class);
-    }
-    
-    /**
-     * Blacklist a token by adding it to Redis
-     */
-    public void blacklistToken(String token) {
-        try {
-            Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(key)
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody();
-            
-            Date expiration = claims.getExpiration();
-            long ttl = expiration.getTime() - System.currentTimeMillis();
-            
-            if (ttl > 0) {
-                redisTemplate.opsForValue().set(
-                        "blacklist:" + token,
-                        "1",
-                        ttl,
-                        TimeUnit.MILLISECONDS
-                );
-                log.info("Token blacklisted until expiration");
-            }
-        } catch (Exception e) {
-            log.error("Error blacklisting token: {}", e.getMessage());
-        }
+
+        Collection<? extends GrantedAuthority> authorities =
+                Arrays.stream(claims.get("roles").toString().split(","))
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(claims.getSubject());
+
+        return new UsernamePasswordAuthenticationToken(userDetails, "", authorities);
     }
 }

@@ -4,9 +4,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import jakarta.persistence.*;
-/**
- * Entity representing a specific alteration in the defect hierarchy, mapped to ALTERATIONS
- */
+
+
+
+
 @Entity
 @Table(name = "ALTERATIONS")
 @Data
@@ -16,21 +17,14 @@ public class Alteration {
 
     @Id
     @Column(name = "CODE_ALTERATION")
-    private String codeAlteration;
-
+    private Integer alterationCode;
+    
     @Column(name = "LIBELLE_ALTERATION")
-    private String libelleAlteration;
-
+    private String alterationLabel;
+    
     @Column(name = "CODE_CHAPITRE")
-    private String codeChapitre;
-
+    private Integer chapterCode;
+    
     @Column(name = "CODE_POINT")
-    private String codePoint;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumns({
-        @JoinColumn(name = "CODE_CHAPITRE", referencedColumnName = "CODE_CHAPITRE", insertable = false, updatable = false),
-        @JoinColumn(name = "CODE_POINT", referencedColumnName = "CODE_POINT", insertable = false, updatable = false)
-    })
-    private DefectPoint defectPoint;
+    private Integer pointCode;
 }

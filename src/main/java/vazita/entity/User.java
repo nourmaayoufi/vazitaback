@@ -2,43 +2,69 @@ package vazita.entity;
 
 import lombok.Data;
 import jakarta.persistence.*;
-import java.time.LocalDate;
 
-@Data
+
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
+
+
+import java.util.Date;
+
 @Entity
 @Table(name = "UTILISATEURS")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class User {
+
     @Id
     @Column(name = "ID_USER")
     private String idUser;
-
+    
     @Column(name = "PASSE")
-    private String passe;
-
+    private String password;
+    
     @Column(name = "NOM")
-    private String nom;
-
+    private String lastName;
+    
     @Column(name = "PRENOM")
-    private String prenom;
-
+    private String firstName;
+    
     @Column(name = "NOMA")
-    private String noma;
-
+    private String lastNameArabic;
+    
     @Column(name = "PRENOMA")
-    private String prenoma;
-
+    private String firstNameArabic;
+    
     @Column(name = "COD_GRP")
-    private Integer codGrp;
-
+    private Integer roleCode;
+    
     @Column(name = "ID_CENTRE")
-    private String idCentre;
-
+    private Integer centerId;
+    
     @Column(name = "DATE_DEB")
-    private LocalDate dateDeb;
-
+    private Date startDate;
+    
     @Column(name = "DATE_FIN")
-    private LocalDate dateFin;
-
+    private Date endDate;
+    
     @Column(name = "ETAT")
-    private String etat;
+    private String status;
+    public boolean isActive() {
+        return "A".equals(this.status);
+    }
+    // Method to convert roleCode to Spring Security role name
+    public String getRoleName() {
+        switch (roleCode) {
+            case 1:
+                return "ROLE_ADMIN";
+            case 2:
+                return "ROLE_INSPECTOR";
+            case 3:
+                return "ROLE_ADJOINT";
+            default:
+                return "ROLE_UNKNOWN";
+        }
+        
+    }
 }

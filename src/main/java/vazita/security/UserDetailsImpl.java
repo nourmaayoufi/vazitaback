@@ -1,71 +1,21 @@
 package vazita.security;
 
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import vazita.entity.User;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 
-/**
- * Implementation of Spring Security's UserDetails for our application
- */
-@AllArgsConstructor
-@Getter
 public class UserDetailsImpl implements UserDetails {
-    private static final long serialVersionUID = 1L;
-
-    private String id;
     private String username;
-    
-    @JsonIgnore
     private String password;
-    
-    private String nom;
-    private String prenom;
-    private String centerId;
+    private Integer centerId;
     private Collection<? extends GrantedAuthority> authorities;
 
-    /**
-     * Create UserDetailsImpl from User entity
-     */
-    public static UserDetailsImpl build(User user) {
-        // Map group code to role name
-        String roleName;
-        switch (user.getCodGrp()) {
-            case 1:
-                roleName = "ROLE_ADMIN";
-                break;
-            case 2:
-                roleName = "ROLE_INSPECTOR";
-                break;
-            case 3:
-                roleName = "ROLE_ADJOINT";
-                break;
-            default:
-                roleName = "ROLE_USER";
-                break;
-        }
-        
-        List<GrantedAuthority> authorities = Collections.singletonList(
-                new SimpleGrantedAuthority(roleName)
-        );
-
-        return new UserDetailsImpl(
-                user.getIdUser(),
-                user.getIdUser(), // Username is the same as ID in our case
-                user.getPasse(),
-                user.getNom(),
-                user.getPrenom(),
-                user.getIdCentre(),
-                authorities
-        );
+    public UserDetailsImpl(String username, String password, Integer centerId, Collection<? extends GrantedAuthority> authorities) {
+        this.username = username;
+        this.password = password;
+        this.centerId = centerId;
+        this.authorities = authorities;
     }
 
     @Override
@@ -81,6 +31,10 @@ public class UserDetailsImpl implements UserDetails {
     @Override
     public String getUsername() {
         return username;
+    }
+
+    public Integer getCenterId() {
+        return centerId;
     }
 
     @Override

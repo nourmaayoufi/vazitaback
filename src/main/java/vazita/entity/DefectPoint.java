@@ -4,9 +4,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import jakarta.persistence.*;
-/**
- * Entity representing a defect point in the hierarchy, mapped to POINTS_DEFAUTS
- */
+
+
+
+
+
 @Entity
 @Table(name = "POINTS_DEFAUTS")
 @Data
@@ -16,15 +18,11 @@ public class DefectPoint {
 
     @Id
     @Column(name = "CODE_POINT")
-    private String codePoint;
-
+    private Integer pointCode;
+    
     @Column(name = "LIBELLE_POINT")
-    private String libellePoint;
-
+    private String pointLabel;
+    
     @Column(name = "CODE_CHAPITRE")
-    private String codeChapitre;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "CODE_CHAPITRE", referencedColumnName = "CODE_CHAPITRE", insertable = false, updatable = false)
-    private Chapter chapter;
+    private Integer chapterCode;
 }
